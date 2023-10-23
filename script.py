@@ -69,10 +69,7 @@ def ooba_call(prompt):
     generator = generate_reply(prompt, shared.persistent_interface_state, stopping_strings=stops)
     answer = ''
     for a in generator:
-        if isinstance(a, str):
-            answer = a
-        else:
-            answer = a[0]
+        answer = a if isinstance(a, str) else a[0]
     for stop in stops:
         if stop in answer:
             answer = answer[:answer.find(stop)]
@@ -129,14 +126,14 @@ Tools = load_tools(
 
 def setup_tools():
     for tool in Tools:
-        AgentOobaVars["tools"][tool.name] = {}
-        AgentOobaVars["tools"][tool.name]["active"] = False
-        AgentOobaVars["tools"][tool.name]["execute"] = False
-        if tool.name in CUSTOM_TOOL_DESCRIPTIONS:
-            AgentOobaVars["tools"][tool.name]["desc"] =  CUSTOM_TOOL_DESCRIPTIONS[tool.name]
-        else:
-            AgentOobaVars["tools"][tool.name]["desc"] = tool.description
-        AgentOobaVars["tools"][tool.name]["tool"] = tool
+        AgentOobaVars["tools"][tool.name] = {
+            "active": False,
+            "execute": False,
+            "desc": CUSTOM_TOOL_DESCRIPTIONS[tool.name]
+            if tool.name in CUSTOM_TOOL_DESCRIPTIONS
+            else tool.description,
+            "tool": tool,
+        }
     
 def update_tool_state(tool_name, statetype, value):
     AgentOobaVars["tools"][tool_name][statetype] = value
@@ -180,7 +177,7 @@ from extensions.AgentOoba.objective import Objective
 def mainloop(ostr):
     AgentOobaVars["processed-task-storage"] = ChromaTaskStorage()
     AgentOobaVars["processed-task-storage"].add_tasks([ostr],["MAIN OBJECTIVE"])
-    yield f"<br>Thinking...<br>"
+    yield "<br>Thinking...<br>"
     AgentOobaVars["main-objective"] = Objective(ostr, -1, 1)
     while (not AgentOobaVars["main-objective"].done):
         yield f'<div class="oobaAgentOutput"><br>{AgentOobaVars["main-objective"].to_string(True)}<br>Thinking...</div>'

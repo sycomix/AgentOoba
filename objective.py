@@ -33,10 +33,12 @@ class Objective:
                 after = "\n".join(self.tasks)
                 print(f"Before:\n{before}\n", file=sys.stderr)
                 print(f"After:\n{after}\n", file=sys.stderr)
-            if len(self.tasks) == 0:
+            if not self.tasks:
                 self.done = True
             else:
-                AgentOobaVars["processed-task-storage"].add_tasks(self.tasks, [uuid.uuid4().hex for task in self.tasks])
+                AgentOobaVars["processed-task-storage"].add_tasks(
+                    self.tasks, [uuid.uuid4().hex for _ in self.tasks]
+                )
 
     def make_prompt(self,
                     directive,
@@ -76,8 +78,14 @@ class Objective:
 
     def do_objective(self):
         directive = AgentOobaVars["directives"]["Do objective directive"]
-        response = ooba_call(self.make_prompt(directive, include_objectives=True, context_abilities=True, context_resources=True)).strip()
-        return response
+        return ooba_call(
+            self.make_prompt(
+                directive,
+                include_objectives=True,
+                context_abilities=True,
+                context_resources=True,
+            )
+        ).strip()
 
     def generate_context(self):
         self.context["resources-available"]="None"
@@ -126,7 +134,9 @@ class Objective:
                     prompt = self.make_prompt(directive, include_objectives=True, context_resources=True)
                     response = ooba_call(prompt).strip()
                     negative_responses = ["i cannot", "am unable"]
-                    if not any([neg in response.lower() for neg in negative_responses]):
+                    if all(
+                        neg not in response.lower() for neg in negative_responses
+                    ):
                         self.context["resources-available"]=old
                         return True, AgentOobaVars["tools"][tool_name]["tool"], response
                 self.context["resources-available"]=old
@@ -170,7 +180,10 @@ class Objective:
             self.add_resource_no_summary(resource)
 
     def add_resource_no_summary(self, resource):
-        if not "resources-available" in self.context or self.context["resources-available"] == "None":
+        if (
+            "resources-available" not in self.context
+            or self.context["resources-available"] == "None"
+        ):
             self.context["resources-available"] = resource
         else:
             self.context["resources-available"] += f"\n{resource}"
@@ -188,7 +201,7 @@ class Objective:
         if self.assess_model_ability():
             response = self.do_objective()
             negative_responses = ["i cannot", "i am unable", "i'm unable"]
-            if not any([neg in response.lower() for neg in negative_responses]):
+            if all(neg not in response.lower() for neg in negative_responses):
                 self.output.append(f"MODEL OUTPUT {response}")
                 if self.parent:
                     self.parent.add_resource(response)
@@ -196,7 +209,7 @@ class Objective:
     def process_current_task(self):
         if self.current_task_idx == len(self.tasks):
             self.current_task_idx = 0
-            if all([(isinstance(task, str) or task.done) for task in self.tasks]):
+            if all((isinstance(task, str) or task.done) for task in self.tasks):
                 self.try_objective()
                 self.done = True
         if not self.done:
@@ -215,9 +228,8 @@ class Objective:
                         self.parent.current_task_idx += 1
             else:
                 current_task.process_current_task()
-        else:
-            if self.parent:
-                self.parent.current_task_idx += 1
+        elif self.parent:
+            self.parent.current_task_idx += 1
 
     def to_string(self, select):
         html_string = f'OBJECTIVE: {escape(self.objective)}<ul class="oobaAgentOutput">'
